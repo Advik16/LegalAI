@@ -1,0 +1,7 @@
+langchain
+openai
+tiktoken
+pypdf
+python-dotenv
+pymupdf
+tools
