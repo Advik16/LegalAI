@@ -9,3 +9,5 @@ fastapi
 faiss-cpu openai
 sentence-transformers
 langchain-community
+langchain-huggingface
+transformers accelerate
