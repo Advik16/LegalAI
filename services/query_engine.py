@@ -1,10 +1,11 @@
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.vectorstores import FAISS
 from transformers import pipeline
+import ollama
 
-pipeline = pipeline("text2text-generation", model="google/flan-t5-base")
+#pipeline_model = pipeline("text-generation", model="microsoft/DialoGPT-medium")
 
-def chunk_retrieval(question: str, index_path: str = 'faiss_index', k: int = 4):
+def chunk_retrieval(question: str, index_path: str = 'faiss_index', k: int = 1):
 
     print("Loading FAISS index from:", index_path)
     
@@ -29,11 +30,26 @@ def chunk_retrieval(question: str, index_path: str = 'faiss_index', k: int = 4):
     return similar_chunks
 
 def llm_response(chunk: str, question: str) -> str:
-    prompt = f"You are an expert law consultant who is using the following to answer the given question. Do not generate response based on other sources and only use the chunk provided as the context: {chunk}\n\nQuestion: {question}"
-    print("Generating response...")
+    prompt = f"""You are an expert law consultant who is using the following from the constitution to answer the given question. Do not generate response based on other sources and only use the chunk provided as the context: 
+    
+    Context: {chunk}
+    Question: {question}
 
-    result = pipeline(prompt, max_length=200, do_sample=False)
+    Answer:"""
+    print("Sending Prompt to LLAMA...")
 
-    return result[0]['generated_response']
+
+    response = ollama.chat(
+        model='phi3',
+        messages=[
+            {"role": "system", "content": "You are a helpful and precise law assistant."},
+            {"role": "user", "content": prompt}
+        ]
+    )
+
+    print("Response Generation Complete")
+
+    return response['message']['content']
+
 
 
