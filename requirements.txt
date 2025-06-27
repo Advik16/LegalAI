@@ -6,8 +6,10 @@ python-dotenv
 pymupdf
 tools
 fastapi
-faiss-cpu openai
 sentence-transformers
 langchain-community
 langchain-huggingface
-transformers accelerate
+streamlit>=1.28.0
+requests>=2.31.0
+pandas>=1.5.0
+numpy>=1.24.0
