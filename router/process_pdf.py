@@ -6,7 +6,7 @@ import os
 
 router = APIRouter()
 
-pdf_path = "Consitution of India.pdf"
+pdf_path = "source_docs/Consitution of India.pdf"
 
 @router.get("/process-pdf")
 async def process_local_pdf():
