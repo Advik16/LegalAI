@@ -1,7 +1,9 @@
-from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.vectorstores import FAISS
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.vectorstores import FAISS
 from transformers import pipeline
 import ollama
+
+embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
 #pipeline_model = pipeline("text-generation", model="microsoft/DialoGPT-medium")
 
@@ -9,7 +11,7 @@ def chunk_retrieval(question: str, index_path: str = 'faiss_index', k: int = 1):
 
     print("Loading FAISS index from:", index_path)
     
-    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    
     vectors = FAISS.load_local(index_path, embeddings, allow_dangerous_deserialization=True)
     print("FAISS index loaded successfully")
     print(f"Performing semantic search for: '{question}', top_k={k}")
@@ -42,14 +44,16 @@ def llm_response(chunk: str, question: str) -> str:
     2. Please mention the source of the information such as Article 15, if the user is asking about a law.
     3. Be conversational with the user based on the tone of the question, at times user may give ask questions to help them understand a critical legal situation, you have to ensure that you understand the tone and synchronize with that.
     4. Do not generate information based on any other source, only use the chunk provided to answer the question. In the event where a chunk is not able to help you answer, simply say I do not know.
-    5. Ask follow up questions from the user, like do you want more information about this etc.
-    6. DO NOT FORM ANY ADDITIONAL POLITICAL OPINION OF YOUR OWN. ENSURE THAT YOU ARE NOT GIVING RESPONSES BASED ON A PARTICULAR SIDE."""
+    5. Do not re-confirm the question asked by the user.
+    6. Ask follow up questions from the user, like do you want more information about this etc.
+    7. DO NOT FORM ANY ADDITIONAL POLITICAL OPINION OF YOUR OWN. ENSURE THAT YOU ARE NOT GIVING RESPONSES BASED ON A PARTICULAR SIDE.
+    8. Do not mention the source as chunk, instead say according to the sources."""
     
     print("Sending Prompt to LLAMA...")
 
 
     response = ollama.chat(
-        model='phi3',
+        model='llama3.2',
         messages=[
             {"role": "system", "content": "You are a helpful and precise law assistant."},
             {"role": "user", "content": prompt}

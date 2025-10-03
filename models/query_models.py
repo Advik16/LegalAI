@@ -3,7 +3,7 @@ from typing import List, Optional
 
 class QueryInput(BaseModel):
     question: str
-    top_k: int = 4
+    top_k: int = 1
 
 class ChunkMetadata(BaseModel):
     page_number: Optional[int]
