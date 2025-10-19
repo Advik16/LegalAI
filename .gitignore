@@ -1,0 +1,9 @@
+venv/
+services/__pycache__/
+test/
+router/__pycache__/
+__pycache__/
+source_docs/
+test_nb.ipynb
+test.py
+log.log
