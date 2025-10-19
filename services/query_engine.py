@@ -2,6 +2,7 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from transformers import pipeline
 import ollama
+import logging
 
 embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
@@ -31,7 +32,7 @@ def chunk_retrieval(question: str, index_path: str = 'faiss_index', k: int = 1):
 
     return similar_chunks
 
-def llm_response(chunk: str, question: str) -> str:
+def llm_response(chunk: str, question: str):
     prompt = f"""You are an expert law consultant who is using the following from the constitution to answer the given question. Based on the chunk provided below, answer the question that the user is asking.
     
     Context: {chunk}
@@ -52,17 +53,18 @@ def llm_response(chunk: str, question: str) -> str:
     print("Sending Prompt to LLAMA...")
 
 
-    response = ollama.chat(
+    for token in ollama.chat(
         model='llama3.2',
         messages=[
             {"role": "system", "content": "You are a helpful and precise law assistant."},
             {"role": "user", "content": prompt}
-        ]
-    )
-
-    print("Response Generation Complete")
-
-    return response['message']['content']
-
+        ], stream=True
+    ):
+        content = token.get("message", {}).get("content", "")
+        if content:
+            logging.debug(f"Streaming token: {content}")
+            yield content
+    logging.info("Streaming completed successfully.")
+    
 
 
