@@ -58,51 +58,51 @@ def log_step(message: str, step_start: float):
     elapsed = time.perf_counter() - step_start
     logger.info(f"{message} - Time taken: {elapsed:.4f} seconds")
 
-@router.post("/query") #Old Endpoint
-async def query_vector_store(query_input: QueryInput):
-    request_start = time.perf_counter()
-    logger.info("=" * 60)
-    logger.info(f"New query request: '{query_input.question}'")
-    try:
-        step_start_1 = time.perf_counter()
-        chunks = chunk_retrieval(query_input.question, k=query_input.top_k)
-        log_step("Chunks retrieved from chunk_retrieval", step_start_1)
-        if chunks is None:
-            logger.error("Chunks Error Occurred")
-            raise HTTPException(status_code=500, detail="Chunking returned None")
-        step_start_2 = time.perf_counter()
-        retrieved_chunk = [
-            RetrievedChunks(
-                content = chunk["content"],
-                metadata=ChunkMetadata(**chunk["metadata"])
-            ) for chunk in chunks
-        ]
-        log_step("Retrieved Chunks Processed", step_start_2)
-        step_start_3 = time.perf_counter()
-        top_chunk = chunks[0]["content"]
-        log_step("Top Chunk Processed", step_start_3)
-        step_start_4 = time.perf_counter()
-        def response_generator():
-            yield f"data: {json.dumps({'retrieved_chunks': [chunk.model_dump() for chunk in retrieved_chunk]})}\n\n"
+# @router.post("/query") #Old Endpoint
+# async def query_vector_store(query_input: QueryInput):
+#     request_start = time.perf_counter()
+#     logger.info("=" * 60)
+#     logger.info(f"New query request: '{query_input.question}'")
+#     try:
+#         step_start_1 = time.perf_counter()
+#         chunks = chunk_retrieval(query_input.question, k=query_input.top_k)
+#         log_step("Chunks retrieved from chunk_retrieval", step_start_1)
+#         if chunks is None:
+#             logger.error("Chunks Error Occurred")
+#             raise HTTPException(status_code=500, detail="Chunking returned None")
+#         step_start_2 = time.perf_counter()
+#         retrieved_chunk = [
+#             RetrievedChunks(
+#                 content = chunk["content"],
+#                 metadata=ChunkMetadata(**chunk["metadata"])
+#             ) for chunk in chunks
+#         ]
+#         log_step("Retrieved Chunks Processed", step_start_2)
+#         step_start_3 = time.perf_counter()
+#         top_chunk = chunks[0]["content"]
+#         log_step("Top Chunk Processed", step_start_3)
+#         step_start_4 = time.perf_counter()
+#         def response_generator():
+#             yield f"data: {json.dumps({'retrieved_chunks': [chunk.model_dump() for chunk in retrieved_chunk]})}\n\n"
 
-            for token in llm_response(top_chunk, query_input.question):
-                if token.strip():  
-                    yield f"data: {json.dumps({'token': token})}\n\n"
+#             for token in llm_response(top_chunk, query_input.question):
+#                 if token.strip():  
+#                     yield f"data: {json.dumps({'token': token})}\n\n"
 
             
-            yield "data: [DONE]\n\n"
+#             yield "data: [DONE]\n\n"
 
-        log_step("Streaming Response Generated", step_start_4)
+#         log_step("Streaming Response Generated", step_start_4)
 
-        return StreamingResponse(response_generator(), media_type="text/event-stream")
+#         return StreamingResponse(response_generator(), media_type="text/event-stream")
 
-    except Exception as e:
-        logger.exception("Error occurred during query processing")
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        total_elapsed = time.perf_counter() - request_start
-        logger.info(f"Total request time: {total_elapsed:.2f}s")
-        logger.info("=" * 60)
+#     except Exception as e:
+#         logger.exception("Error occurred during query processing")
+#         raise HTTPException(status_code=500, detail=str(e))
+#     finally:
+#         total_elapsed = time.perf_counter() - request_start
+#         logger.info(f"Total request time: {total_elapsed:.2f}s")
+#         logger.info("=" * 60)
     
 @router.post("/query/stream")
 async def query_vector_store_stream(query_input: QueryInput):

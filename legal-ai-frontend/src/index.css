@@ -2,26 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
-/* === Custom Styling === */
-html,
-body,
-#root {
-  height: 100%;
-  margin: 0;
-  font-family: "Inter", system-ui, Avenir, Helvetica, Arial, sans-serif;
-  background-color: #f9fafb;
+/* small extra */
+:root {
+  --cream-50: #fbf7f5;
+}
+.bg-cream-50 {
+  background-color: var(--cream-50);
 }
 
-/* Scrollbar Styling */
-::-webkit-scrollbar {
-  width: 8px;
-}
-
-::-webkit-scrollbar-thumb {
-  background-color: rgba(156, 163, 175, 0.5);
-  border-radius: 9999px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(107, 114, 128, 0.7);
+/* make textarea placeholder color subtle */
+textarea::placeholder {
+  color: rgba(107, 114, 128, 0.6); /* tailwind gray-500/60 */
 }
