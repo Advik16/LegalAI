@@ -8,6 +8,7 @@ class QueryInput(BaseModel):
 class ChunkMetadata(BaseModel):
     page_number: Optional[int]
     chunk_index: Optional[int]
+    document_id: str
 
 class RetrievedChunks(BaseModel):
     content: str
@@ -17,3 +18,7 @@ class QueryResponse(BaseModel):
     query: str
     retrieved_chunks: List[RetrievedChunks]
     response: str
+
+class QueryChatInput(BaseModel):
+    question: str
+    conversation_id: str

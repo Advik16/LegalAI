@@ -6,15 +6,18 @@ import pickle
 import threading
 from contextlib import contextmanager, asynccontextmanager
 from typing import Optional, List, Dict, Any
+from starlette.concurrency import run_in_threadpool
 
-from fastapi import HTTPException, APIRouter
+from fastapi import HTTPException, APIRouter, BackgroundTasks
 from fastapi.responses import StreamingResponse
 
 import faiss
 from sentence_transformers import SentenceTransformer
 
-from models.query_models import QueryInput, QueryResponse, ChunkMetadata, RetrievedChunks
+from models.query_models import QueryInput, QueryResponse, ChunkMetadata, RetrievedChunks, QueryChatInput
 from services.query_engine import chunk_retrieval, llm_response
+from databases.extract_db import get_chunk_row
+from databases.update_db import start_new_conversation
 
 logging.basicConfig(
     level=logging.INFO,
@@ -165,7 +168,7 @@ def log_step(message: str, step_start: float):
 
 
 @router.post("/query/stream")
-async def query_vector_store_stream(query_input: QueryInput):
+async def query_vector_store_stream(query_input: QueryInput, background_tasks: BackgroundTasks):
     """
     Streaming variant of the query endpoint with slightly different token generator semantics.
     """
@@ -194,15 +197,53 @@ async def query_vector_store_stream(query_input: QueryInput):
 
         step_start_3 = time.perf_counter()
         top_chunk = chunks[0]["content"]
+        top_meta = ChunkMetadata(**(chunks[0].get("metadata") or {}))
         log_step("Top Chunk Processed", step_start_3)
 
         step_start_4 = time.perf_counter()
 
-        def token_generator(top_chunk_local, query_input_local):
+        async def token_generator(top_chunk_local, top_meta_local, query_input_local):
+            accumulated_tokens = []
+            
             try:
+                try:
+                    yield f"data: {json.dumps({'source': top_meta_local.dict()})}\n\n"
+                except Exception:
+                    pass
+
                 for token in llm_response(top_chunk_local, query_input_local.question):
+                    accumulated_tokens.append(token)
                     yield f"data: {json.dumps({'token': token})}\n\n"
                     time.sleep(0)
+                
+                full_response = "".join(accumulated_tokens)
+
+                doc_id = getattr(top_meta_local, "document_id", None)
+                page_no = getattr(top_meta_local, "page_number", None)
+                chunk_idx = getattr(top_meta_local, "chunk_index", None)
+
+                if doc_id is None or page_no is None or chunk_idx is None:
+                    logger.error("Top chunk metadata missing required fields")
+                    raise HTTPException(status_code=500, detail="Missing chunk metadata (document_id/page_number/chunk_index)")
+                
+                chunk_row = await run_in_threadpool(get_chunk_row, doc_id, int(page_no), int(chunk_idx))
+                
+                if not chunk_row:
+                    logger.error("No entry found in documents table for provided metadata")
+                    raise HTTPException(status_code=500, detail="No matching chunk row in documents table")
+                
+                chunk_id = chunk_row["chunk_id"]
+                document_id = chunk_row["document_id"]
+
+                background_tasks.add_task(start_new_conversation, document_id, chunk_id, query_input_local.question, full_response)
+
+                final_event = {
+                    "final_response": full_response,
+                    "document_id": document_id,
+                    "chunk_id": chunk_id
+                }
+                yield f"data: {json.dumps(final_event)}\n\n"
+                
             except Exception as e:
                 yield f"data: {json.dumps({'error': str(e)})}\n\n"
             finally:
@@ -210,8 +251,12 @@ async def query_vector_store_stream(query_input: QueryInput):
 
         log_step("Streaming Response Started", step_start_4)
 
-        return StreamingResponse(token_generator(top_chunk, query_input), media_type="text/event-stream")
+        return StreamingResponse(token_generator(top_chunk, top_meta, query_input), media_type="text/event-stream")
 
     except Exception as e:
         logger.error(f"Query stream failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+    
+@router.post("/chat/stream")
+async def chat_stream(query_input: QueryChatInput, background_tasks: BackgroundTasks):
+    return None

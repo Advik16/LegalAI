@@ -25,7 +25,8 @@ const LogoIcon = () => (
 
 /**
  * useSSEStream - minimal SSE streaming helper (POST sends JSON `payload`)
- * expects SSE frames like: data: {"token":"..."}
+ * expects SSE frames like: data: {"token":"..."} or structured payloads like
+ * data: {"source": {...}} or data: {"final_response": "...", "chunk_id": "..."}
  */
 function useSSEStream() {
   const controllerRef = useRef(null);
@@ -84,11 +85,14 @@ function useSSEStream() {
             try {
               const parsed = JSON.parse(payloadText);
               if (parsed && typeof parsed.token !== "undefined") {
+                // token strings kept as strings
                 onToken?.(String(parsed.token));
               } else {
-                onToken?.(JSON.stringify(parsed));
+                // pass non-token structured payloads (metadata / final response) as objects
+                onToken?.(parsed);
               }
             } catch {
+              // not JSON — send raw token text
               onToken?.(payloadText);
             }
           }
@@ -101,12 +105,16 @@ function useSSEStream() {
         for (const line of lines) {
           if (!line.startsWith("data:")) continue;
           const payloadText = line.replace(/^data:\s*/, "");
+          if (payloadText === "[DONE]") {
+            onDone?.();
+            break;
+          }
           try {
             const parsed = JSON.parse(payloadText);
             if (parsed && typeof parsed.token !== "undefined") {
               onToken?.(String(parsed.token));
             } else {
-              onToken?.(JSON.stringify(parsed));
+              onToken?.(parsed);
             }
           } catch {
             onToken?.(payloadText);
@@ -140,7 +148,7 @@ function useSSEStream() {
  */
 export default function LegalChamberStreamed() {
   const [messages, setMessages] = useState([
-    // conversation messages: { role: 'user'|'assistant'|'system', content: string }
+    // conversation messages: { role: 'user'|'assistant'|'system', content: string, metadata?: {} }
   ]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -187,10 +195,74 @@ export default function LegalChamberStreamed() {
     stream.start({
       url,
       payload,
-      onToken: (token) => {
-        // append token to the last assistant message
+      onToken: (tokenOrObj) => {
+        // if the SSE payload is an object (metadata / final_response), handle specially
+        if (typeof tokenOrObj === "object" && tokenOrObj !== null) {
+          const payloadObj = tokenOrObj;
+
+          // SOURCE metadata (sent at start)
+          if (payloadObj.source) {
+            // attach metadata to the last assistant message (without modifying its content)
+            setMessages((prev) => {
+              const msgs = prev.slice();
+              for (let i = msgs.length - 1; i >= 0; i--) {
+                if (msgs[i].role === "assistant") {
+                  msgs[i] = { ...msgs[i], metadata: payloadObj.source };
+                  break;
+                }
+              }
+              return msgs;
+            });
+            return;
+          }
+
+          // FINAL response (sent at end)
+          if (payloadObj.final_response) {
+            setMessages((prev) => {
+              const msgs = prev.slice();
+              for (let i = msgs.length - 1; i >= 0; i--) {
+                if (msgs[i].role === "assistant") {
+                  // replace content with the final response (prevents metadata being concatenated)
+                  msgs[i] = {
+                    ...msgs[i],
+                    content: payloadObj.final_response,
+                    metadata: {
+                      ...(msgs[i].metadata || {}),
+                      document_id: payloadObj.document_id,
+                      chunk_id: payloadObj.chunk_id,
+                    },
+                    streaming: false,
+                  };
+                  break;
+                }
+              }
+              return msgs;
+            });
+            // mark streaming stopped locally (onDone will also be called)
+            setIsStreaming(false);
+            return;
+          }
+
+          // Other structured payloads we didn't expect: store them as metadata.extra
+          setMessages((prev) => {
+            const msgs = prev.slice();
+            for (let i = msgs.length - 1; i >= 0; i--) {
+              if (msgs[i].role === "assistant") {
+                msgs[i] = {
+                  ...msgs[i],
+                  metadata: { ...(msgs[i].metadata || {}), extra: payloadObj },
+                };
+                break;
+              }
+            }
+            return msgs;
+          });
+          return;
+        }
+
+        // else: it's a token string — append to the last assistant message
+        const token = String(tokenOrObj);
         setMessages((prev) => {
-          // find last assistant index
           const msgs = prev.slice();
           for (let i = msgs.length - 1; i >= 0; i--) {
             if (msgs[i].role === "assistant") {
@@ -202,7 +274,7 @@ export default function LegalChamberStreamed() {
         });
       },
       onDone: () => {
-        // mark assistant streaming as finished
+        // mark assistant streaming as finished (safety: idempotent)
         setMessages((prev) => {
           const msgs = prev.slice();
           for (let i = msgs.length - 1; i >= 0; i--) {
@@ -317,8 +389,17 @@ export default function LegalChamberStreamed() {
                   <div className={bubbleClass} style={{ whiteSpace: "pre-wrap" }}>
                     {m.content || (m.streaming ? "…" : "")}
                   </div>
-                  {/* small meta for streaming */}
+
+                  {/* small meta for streaming / source */}
                   {m.streaming ? <div className="text-xs text-gray-400 mt-1">Streaming...</div> : null}
+
+                  {/* show metadata if present (document_id / chunk_id) */}
+                  {m.metadata?.document_id && (
+                    <div className="text-xs text-gray-400 mt-1">
+                      Source: {m.metadata.document_id}
+                      {m.metadata.chunk_id ? ` • chunk: ${m.metadata.chunk_id}` : m.metadata.chunk_index ? ` • chunk index: ${m.metadata.chunk_index}` : null}
+                    </div>
+                  )}
                 </div>
               </div>
             );

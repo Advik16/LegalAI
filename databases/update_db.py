@@ -1,6 +1,8 @@
 import sqlite3
 import uuid
 from typing import List, Dict, Any
+from datetime import datetime
+import json
 
 DB_PATH = "legal_ai.db"
 
@@ -68,7 +70,83 @@ def get_all_chunks() -> List[Dict[str, Any]]:
     finally:
         conn.close()
 
-def create_user_id() -> str:
-    return uuid.uuid4().hex
-def create_conversation_id() -> str:
-    return uuid.uuid4().hex
+def start_new_conversation(document_id: str, chunk_id: str, user_query: str, llm_response: str):
+    conn = _get_conn()
+    conversation_id = uuid.uuid4().hex
+    user_id = "abc"
+    messages_json = {
+        "Content": {
+            "Query": user_query,
+            "Response": llm_response
+        },
+        "History": []
+    }
+    created_at = updated_at = datetime.now()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO conversations (conversation_id, user_id, document_id, chunk_id, messages_json, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                conversation_id,
+                user_id,
+                document_id,
+                chunk_id,
+                json.dumps(messages_json),
+                created_at,
+                updated_at,
+            ),
+        )
+        conn.commit()
+        return conversation_id
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+def update_conversation(conversation_id: str, user_query: str, llm_response: str):
+    conn = _get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT messages_json FROM conversations WHERE conversation_id = ?",
+            (conversation_id,),
+        )
+        row = cur.fetchone()
+        if row is None:
+            cur.execute("ROLLBACK")
+            raise ValueError(F"No conversation found for conversation_id={conversation_id}")
+        
+        messages = json.loads(row[0])
+
+        old_content = messages["Content"]
+        messages["History"].append(old_content)
+
+        messages["Content"] = {
+            "Query": user_query,
+            "Response": llm_response
+        }
+
+        updated_at = datetime.now()
+
+        cur.execute(
+            """
+          UPDATE conversations
+          SET messages_json = %s, updated_at = %s
+          WHERE conversation_id = %s
+            """,
+            (json.dumps(messages), updated_at, conversation_id),
+        )
+        conn.commit()
+        return True
+    
+    except Exception as e:
+        conn.rollback()
+        raise e
+    
+    finally:
+        cur.close()
+        conn.close()
