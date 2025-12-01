@@ -72,7 +72,7 @@ def llm_chat_response(conversation_id: str, question: str):
     cursor = conn.cursor()
 
     try:
-        cursor.execute("SELECT messages_json FROM conversations WHERE conversations_id = ?", (conversation_id,))
+        cursor.execute("SELECT messages_json FROM conversations WHERE conversation_id = ?", (conversation_id,))
         row = cursor.fetchone()
         if row and row[0]:
             raw_messages_json = row[0]
