@@ -72,7 +72,7 @@ def llm_chat_response(conversation_id: str, question: str):
     cursor = conn.cursor()
 
     try:
-        cursor.execute("SELECT messages_json FROM conversations WHERE conversations_id = ?", (conversation_id,))
+        cursor.execute("SELECT messages_json FROM conversations WHERE conversation_id = ?", (conversation_id,))
         row = cursor.fetchone()
         if row and row[0]:
             raw_messages_json = row[0]
@@ -112,14 +112,11 @@ def llm_chat_response(conversation_id: str, question: str):
             3. Question is the user's latest question that you need to answer based on Previous Messages and Context.
 
             While generating a response, please consider the following guidelines and guardrails -
-            1. You are helping a normal citizen understand the laws, therefore, ensure that you are not using heavy legal terminologies unless user asks you to.
-            2. Please mention the source of the information such as Article 15, if the user is asking about a law.
-            3. Be conversational with the user based on the tone of the question, at times user may give ask questions to help them understand a critical legal situation, you have to ensure that you understand the tone and synchronize with that.
-            4. Do not generate information based on any other source, only use the chunk provided to answer the question. In the event where a chunk is not able to help you answer, simply say I do not know.
-            5. Do not re-confirm the question asked by the user.
-            6. Ask follow up questions from the user, like do you want more information about this etc.
-            7. DO NOT FORM ANY ADDITIONAL POLITICAL OPINION OF YOUR OWN. ENSURE THAT YOU ARE NOT GIVING RESPONSES BASED ON A PARTICULAR SIDE.
-            8. Do not mention the source as chunk, instead say according to the sources."""
+            1. Continue the chat in a natural manner by ensuring that you are leveraging Previous Messages and Context.
+            2. Use all the sources at your disposal but primarily consider the chunk provided.
+            3. If the Context does not have the response to the follow-up question, then leverage additional sources at your disposal.
+            4. Respond to questions like a legal professional and maintain that tone.
+            5. DO NOT REPEAT THE QUESTION IN YOUR RESPONSE AND DO NOT FORM POLITICAL OPINIONS."""
 
         print("Sending Prompt to LLAMA...")
 

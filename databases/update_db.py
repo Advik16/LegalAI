@@ -135,8 +135,8 @@ def update_conversation(conversation_id: str, user_query: str, llm_response: str
         cur.execute(
             """
           UPDATE conversations
-          SET messages_json = %s, updated_at = %s
-          WHERE conversation_id = %s
+          SET messages_json = ?, updated_at = ?
+          WHERE conversation_id = ?
             """,
             (json.dumps(messages), updated_at, conversation_id),
         )

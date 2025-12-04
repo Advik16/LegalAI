@@ -4,6 +4,7 @@ import json
 import logging
 import pickle
 import threading
+import asyncio
 from contextlib import contextmanager, asynccontextmanager
 from typing import Optional, List, Dict, Any
 from starlette.concurrency import run_in_threadpool
@@ -15,9 +16,9 @@ import faiss
 from sentence_transformers import SentenceTransformer
 
 from models.query_models import QueryInput, QueryResponse, ChunkMetadata, RetrievedChunks, QueryChatInput
-from services.query_engine import chunk_retrieval, llm_response
+from services.query_engine import chunk_retrieval, llm_response, llm_chat_response
 from databases.extract_db import get_chunk_row
-from databases.update_db import start_new_conversation
+from databases.update_db import start_new_conversation, update_conversation
 
 logging.basicConfig(
     level=logging.INFO,
@@ -109,64 +110,6 @@ def log_step(message: str, step_start: float):
         pass
 
 
-# @router.post("/query")
-# async def query_vector_store(query_input: QueryInput):
-#     """
-#     Query endpoint that retrieves top-k chunks and returns a streaming response containing
-#     the retrieved chunks metadata followed by tokens from the LLM response.
-#     """
-#     request_start = time.perf_counter()
-#     logger.info("=" * 60)
-#     logger.info(f"New query request: '{query_input.question}'")
-
-#     try:
-#         step_start_1 = time.perf_counter()
-#         chunks = chunk_retrieval(query_input.question, k=query_input.top_k)
-#         log_step("Chunks retrieved from chunk_retrieval", step_start_1)
-
-#         if chunks is None:
-#             logger.error("Chunks Error Occurred")
-#             raise HTTPException(status_code=500, detail="Chunking returned None")
-
-#         step_start_2 = time.perf_counter()
-#         retrieved_chunk = [
-#             RetrievedChunks(
-#                 content=chunk["content"],
-#                 metadata=ChunkMetadata(**chunk["metadata"])
-#             ) for chunk in chunks
-#         ]
-#         log_step("Retrieved Chunks Processed", step_start_2)
-
-#         step_start_3 = time.perf_counter()
-#         top_chunk = chunks[0]["content"]
-#         log_step("Top Chunk Processed", step_start_3)
-
-#         step_start_4 = time.perf_counter()
-
-#         def response_generator():
-#             # send retrieved chunk metadata first
-#             yield f"data: {json.dumps({'retrieved_chunks': [chunk.model_dump() for chunk in retrieved_chunk]})}\n\n"
-
-#             # stream tokens from llm_response generator
-#             for token in llm_response(top_chunk, query_input.question):
-#                 if token.strip():
-#                     yield f"data: {json.dumps({'token': token})}\n\n"
-
-#             yield "data: [DONE]\n\n"
-
-#         log_step("Streaming Response Generated", step_start_4)
-
-#         return StreamingResponse(response_generator(), media_type="text/event-stream")
-
-#     except Exception as e:
-#         logger.exception("Error occurred during query processing")
-#         raise HTTPException(status_code=500, detail=str(e))
-#     finally:
-#         total_elapsed = time.perf_counter() - request_start
-#         logger.info(f"Total request time: {total_elapsed:.2f}s")
-#         logger.info("=" * 60)
-
-
 @router.post("/query/stream")
 async def query_vector_store_stream(query_input: QueryInput, background_tasks: BackgroundTasks):
     """
@@ -214,7 +157,7 @@ async def query_vector_store_stream(query_input: QueryInput, background_tasks: B
                 for token in llm_response(top_chunk_local, query_input_local.question):
                     accumulated_tokens.append(token)
                     yield f"data: {json.dumps({'token': token})}\n\n"
-                    time.sleep(0)
+                    await asyncio.sleep(0)
                 
                 full_response = "".join(accumulated_tokens)
 
@@ -235,12 +178,22 @@ async def query_vector_store_stream(query_input: QueryInput, background_tasks: B
                 chunk_id = chunk_row["chunk_id"]
                 document_id = chunk_row["document_id"]
 
-                background_tasks.add_task(start_new_conversation, document_id, chunk_id, query_input_local.question, full_response)
+                #background_tasks.add_task(start_new_conversation, document_id, chunk_id, query_input_local.question, full_response)
+                try:
+                    conversation_id = await run_in_threadpool(start_new_conversation
+                                                              , document_id
+                                                              , chunk_id
+                                                              , query_input_local.question
+                                                              , full_response)
+                except Exception as db_exc:
+                    logger.exception("start_new_conversation failed")
+                    conversation_id = None
 
                 final_event = {
                     "final_response": full_response,
                     "document_id": document_id,
-                    "chunk_id": chunk_id
+                    "chunk_id": chunk_id,
+                    "conversation_id": conversation_id
                 }
                 yield f"data: {json.dumps(final_event)}\n\n"
                 
@@ -259,4 +212,48 @@ async def query_vector_store_stream(query_input: QueryInput, background_tasks: B
     
 @router.post("/chat/stream")
 async def chat_stream(query_input: QueryChatInput, background_tasks: BackgroundTasks):
-    return None
+    conversation_id = getattr(query_input, "conversation_id", None)
+    question = getattr(query_input, "question", None)
+
+    if not conversation_id or not isinstance(conversation_id, str):
+        raise HTTPException(status_code=400, detail="conversation_id (str) is required")
+    if not question or not isinstance(question, str):
+        raise HTTPException(status_code=400, detail="question (str) is required")
+    
+    logger.info("Starting chat_stream for conversation_id=%s", conversation_id)
+
+    async def token_generator(conv_id: str, q: str):
+        accumulated = []
+
+        try:
+            for token in llm_chat_response(conv_id, q):
+                if isinstance(token, str) and token.startswith("Error:"):
+                    yield f"data : {json.dumps({'error': token})}\n\n"
+                    break
+
+                try:
+                    yield f"data: {json.dumps({'token': token})}\n\n"
+                except Exception:
+                    yield f"data: {json.dumps({'token': str(token)})}\n\n"
+
+                accumulated.append(str(token))
+                time.sleep(0)
+
+            full_response = "".join(accumulated)
+
+            try:
+                background_tasks.add_task(update_conversation, conv_id, q, full_response)
+            except Exception as e:
+                    logger.exception("Failed to schedule update_conversation for %s: %s", conv_id, e)
+
+            final_event = {"final_response": full_response, "conversation_id": conv_id}
+            yield f"data: {json.dumps(final_event)}\n\n"
+
+        except Exception as e:
+            logger.exception("chat_stream token_generator error for %s: %s", conv_id, e)
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+        finally:
+            yield "data: [DONE]\n\n"
+    
+    return StreamingResponse(token_generator(conversation_id, question), media_type="text/event-stream")
+        
