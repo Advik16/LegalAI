@@ -4,6 +4,7 @@ import json
 import logging
 import pickle
 import threading
+import asyncio
 from contextlib import contextmanager, asynccontextmanager
 from typing import Optional, List, Dict, Any
 from starlette.concurrency import run_in_threadpool
@@ -156,7 +157,7 @@ async def query_vector_store_stream(query_input: QueryInput, background_tasks: B
                 for token in llm_response(top_chunk_local, query_input_local.question):
                     accumulated_tokens.append(token)
                     yield f"data: {json.dumps({'token': token})}\n\n"
-                    time.sleep(0)
+                    await asyncio.sleep(0)
                 
                 full_response = "".join(accumulated_tokens)
 
@@ -177,12 +178,22 @@ async def query_vector_store_stream(query_input: QueryInput, background_tasks: B
                 chunk_id = chunk_row["chunk_id"]
                 document_id = chunk_row["document_id"]
 
-                background_tasks.add_task(start_new_conversation, document_id, chunk_id, query_input_local.question, full_response)
+                #background_tasks.add_task(start_new_conversation, document_id, chunk_id, query_input_local.question, full_response)
+                try:
+                    conversation_id = await run_in_threadpool(start_new_conversation
+                                                              , document_id
+                                                              , chunk_id
+                                                              , query_input_local.question
+                                                              , full_response)
+                except Exception as db_exc:
+                    logger.exception("start_new_conversation failed")
+                    conversation_id = None
 
                 final_event = {
                     "final_response": full_response,
                     "document_id": document_id,
-                    "chunk_id": chunk_id
+                    "chunk_id": chunk_id,
+                    "conversation_id": conversation_id
                 }
                 yield f"data: {json.dumps(final_event)}\n\n"
                 

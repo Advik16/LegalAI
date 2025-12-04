@@ -9,6 +9,7 @@ class ChunkMetadata(BaseModel):
     page_number: Optional[int]
     chunk_index: Optional[int]
     document_id: str
+    #conversation_id: str
 
 class RetrievedChunks(BaseModel):
     content: str
