@@ -286,7 +286,7 @@ export default function LegalChamberStreamed({
           <LogoIcon />
           <div>
             <div className="font-semibold text-lg">LegalAI</div>
-            <div className="text-sm opacity-90">Iustitia Omnibus • Justice for All</div>
+            <div className="text-sm opacity-90">Satyamev Jayate • Justice for All</div>
           </div>
 
           <div className="ml-auto opacity-90 text-sm flex items-center gap-2">
