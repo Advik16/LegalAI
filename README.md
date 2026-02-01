@@ -1,5 +1,7 @@
 # LegalAI
 
+> ⚠️ This is a personal portfolio project published for demonstration and evaluation purposes only.
+
 LegalAI is a virtual legal assistant designed to demonstrate the implementation of a Retrieval-Augmented Generation (RAG) system for legal documents. The application uses semantic search and natural language processing techniques to retrieve relevant legal context and generate informative responses to user queries.
 
 At its current stage, the system is configured to reference the **Constitution of India** as its primary knowledge source. Support for additional legal domains and enhanced features is planned in future phases.
