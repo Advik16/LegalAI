@@ -1,14 +1,30 @@
 # LegalAI
 
-LegalAI is a virtual legal assistant designed to provide general legal information and assist users with their legal inquiries. It leverages advanced natural language processing (NLP) techniques and a semantic search engine to retrieve and process legal documents.
+LegalAI is a virtual legal assistant designed to demonstrate the implementation of a Retrieval-Augmented Generation (RAG) system for legal documents. The application uses semantic search and natural language processing techniques to retrieve relevant legal context and generate informative responses to user queries.
 
-At the moment, this application refers to the Constitution of India to answer any questions asked by the user. More updates on expanded domains and features will come through in phases.
+At its current stage, the system is configured to reference the **Constitution of India** as its primary knowledge source. Support for additional legal domains and enhanced features is planned in future phases.
 
 ## Features
 
 - **Semantic Search**: Perform semantic searches on the document embeddings to retrieve relevant information.
 - **Interactive Chat**: Engage in a conversational interface to ask legal questions and receive responses.
 - **Frontend Interface**: A user-friendly web interface for interacting with the system.
+
+---
+
+## Tech Stack
+
+- **Backend:** Python, FastAPI  
+- **Vector Search:** FAISS  
+- **NLP / Embeddings:** HuggingFace Transformers  
+- **Database:** SQLite  
+- **Frontend:** Node.js, React
+
+---
+
+## High-Level Architecture
+
+The system ingests legal documents, chunks and embeds the content using transformer-based embeddings, and stores them in a vector index. During user queries, the most relevant chunks are retrieved using semantic similarity search and passed to a locally hosted language model to generate context-aware responses.
 
 ---
 
@@ -70,13 +86,15 @@ At the moment, this application refers to the Constitution of India to answer an
 
 ## Usage
 
-1. Ask questions to perform semantic searches and generate responses.
-2. Continue the chat by asking follow-up questions. Follow-up questions will be answered using the same chunk that was leveraged for the first interaction.
-3. Chat history will be stored in legal_ai.db.
+1. Ask legal questions to retrieve relevant sections from the document corpus.
+2. Continue the conversation with follow-up questions; responses will reference the same retrieved context for consistency.
+3. Chat history is persisted locally in legal_ai.db.
 
-## Notes
-1. This project is for educational purposes only and does not provide legal advice.
-2. Always consult a licensed attorney for professional legal counsel.
+## Notes & Disclaimer
+This project is intended for educational and demonstration purposes only and does
+not provide legal advice.
+
+Always consult a licensed attorney for professional legal counsel.
 
 ## License
 All rights reserved. This repository is published for portfolio demonstration only.
