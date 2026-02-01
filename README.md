@@ -28,7 +28,18 @@ LegalAI is a virtual legal assistant designed to provide general legal informati
    cd <repository-folder>
 
 2. Create a virtual environment:
+    ```bash
     python -m venv .venv
 
 3. Activate the virtual environment:
+   a. On Windows:
+   ```bash
+   .venv\Scripts\activate
+
+   b. On macOS/Linux:
+   ```bash
+   source .venv/bin/activate
+
+4. Install the required Python dependencies:
+
 
