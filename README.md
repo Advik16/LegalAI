@@ -35,12 +35,30 @@ The system ingests legal documents, chunks and embeds the content using transfor
 - Python 3.9 or higher
 - Node.js and npm (for the frontend)
 - SQLite (for the database)
+- Ollama (for running llama3.2 locally)
 
 ---
 
 ## Installation and Setup
 
-### 1. Backend Setup
+### 1. LLM Setup (Ollama)
+
+1. Install Ollama:
+https://ollama.com
+
+After installation, verify:
+```bash
+ollama --version
+
+2. Pull the LLaMa 3.2 Model:
+```bash
+ollama pull llama3.2
+
+3. Start the Ollama Service:
+```bash
+ollama serve
+
+### 2. Backend Setup
 
 1. Clone the repository:
    ```bash
@@ -68,7 +86,7 @@ The system ingests legal documents, chunks and embeds the content using transfor
    ```bash
    uvicorn main:app --host 127.0.0.1 --port 8080 --reload
 
-### 2. Frontend Setup
+### 3. Frontend Setup
 
 1. Open a new terminal and navigate to legal-ai-frontend folder:
    ```bash
