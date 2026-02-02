@@ -43,20 +43,19 @@ The system ingests legal documents, chunks and embeds the content using transfor
 
 ### 1. LLM Setup (Ollama)
 
-1. Install Ollama:
-https://ollama.com
+1. Install Ollama: https://ollama.com
 
-After installation, verify:
+2. After installation, verify:
+```bash
+ollama --version
+
+3. Pull the LLaMa 3.2 Model:
    ```bash
-   ollama --version
+   ollama pull llama3.2
 
-2. Pull the LLaMa 3.2 Model:
-```bash
-ollama pull llama3.2
-
-3. Start the Ollama Service:
-```bash
-ollama serve
+4. Start the Ollama Service:
+   ```bash
+   ollama serve
 
 ### 2. Backend Setup
 
