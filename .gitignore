@@ -9,3 +9,4 @@ test.py
 log.log
 legal-ai-frontend/node_modules
 .venv/
+.DS_Store
