@@ -46,8 +46,8 @@ The system ingests legal documents, chunks and embeds the content using transfor
 1. Install Ollama: https://ollama.com
 
 2. After installation, verify:
-```bash
-ollama --version
+   ```bash
+   ollama --version
 
 3. Pull the LLaMa 3.2 Model:
    ```bash
