@@ -60,9 +60,18 @@ async def lifespan(app):
     # If index exists, load it; else leave globals None and rely on on-demand creation.
     if os.path.exists(index_path) and os.path.exists(docstore_path):
         with _index_lock:
-            faiss_index = faiss.read_index(index_path)
-            with open(docstore_path, "rb") as f:
-                docstore = pickle.load(f)
+            try:
+                faiss_index = faiss.read_index(index_path)
+                with open(docstore_path, "rb") as f:
+                    docstore = pickle.load(f)
+            except Exception as e:
+                logger.error(
+                    "Failed to load persisted FAISS index/docstore. "
+                    "They will be rebuilt on demand.",
+                    exc_info=e
+                )
+                faiss_index = None
+                docstore = None
         logger.info("Loaded existing FAISS index and docstore.")
     else:
         logger.info("FAISS index or docstore not found at startup; will be created on demand.")
